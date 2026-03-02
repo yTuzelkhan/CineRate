@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CineRate — My Personal Ratings</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0c;
+    --surface: #111115;
+    --card: #16161c;
+    --border: #2a2a35;
+    --accent: #e8b84b;
+    --accent2: #c0392b;
+    --text: #e8e6e0;
+    --muted: #6b6870;
+    --watched: #27ae60;
+    --watching: #2980b9;
+    --plan: #8e44ad;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 300;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* NOISE OVERLAY */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.4;
+  }
+
+  /* HEADER */
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(10,10,12,0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 64px;
+  }
+
+  .logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2rem;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+  }
+  .logo span { color: var(--text); }
+
+  .header-actions { display: flex; gap: 1rem; align-items: center; }
+
+  /* FILTERS */
+  .filters {
+    padding: 1.5rem 2rem;
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .filter-btn {
+    padding: 0.4rem 1rem;
+    border-radius: 2px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .filter-btn:hover, .filter-btn.active {
+    background: var(--accent);
+    color: #000;
+    border-color: var(--accent);
+  }
+
+  .search-box {
+    margin-left: auto;
+    padding: 0.4rem 1rem;
+    border-radius: 2px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.85rem;
+    width: 220px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .search-box:focus { border-color: var(--accent); }
+  .search-box::placeholder { color: var(--muted); }
+
+  /* STATS BAR */
+  .stats-bar {
+    padding: 1rem 2rem;
+    display: flex;
+    gap: 2rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .stat { display: flex; flex-direction: column; gap: 0.1rem; }
+  .stat-val {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.6rem;
+    color: var(--accent);
+    line-height: 1;
+  }
+  .stat-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+
+  /* GRID */
+  main { padding: 2rem; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1.5rem;
+  }
+
+  /* CARD */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.25s, border-color 0.25s, box-shadow 0.25s;
+    animation: fadeIn 0.4s ease both;
+  }
+  .card:hover {
+    transform: translateY(-4px);
+    border-color: var(--accent);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5), 0 0 0 1px var(--accent);
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .card-poster {
+    width: 100%;
+    aspect-ratio: 2/3;
+    object-fit: cover;
+    display: block;
+    background: var(--surface);
+    position: relative;
+  }
+
+  .poster-placeholder {
+    width: 100%;
+    aspect-ratio: 2/3;
+    background: linear-gradient(135deg, #1a1a22, #0f0f15);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    color: var(--muted);
+    font-size: 2.5rem;
+    position: relative;
+    overflow: hidden;
+  }
+  .poster-placeholder::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      45deg, transparent, transparent 20px,
+      rgba(255,255,255,0.01) 20px, rgba(255,255,255,0.01) 21px
+    );
+  }
+  .poster-placeholder span { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; }
+
+  .card-poster-wrap { position: relative; }
+
+  .card-type-badge {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    padding: 0.2rem 0.5rem;
+    font-size: 0.65rem;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    border-radius: 2px;
+    background: rgba(0,0,0,0.8);
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .badge-movie { color: #e8b84b; }
+  .badge-series { color: #6ab0f5; }
+
+  .status-dot {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(0,0,0,0.5);
+  }
+  .dot-watched { background: var(--watched); }
+  .dot-watching { background: var(--watching); }
+  .dot-plan { background: var(--plan); }
+
+  .card-body { padding: 0.75rem; }
+  .card-title {
+    font-size: 0.9rem;
+    font-weight: 500;
+    line-height: 1.3;
+    margin-bottom: 0.35rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .card-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .card-year { font-size: 0.75rem; color: var(--muted); }
+  .card-score {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.1rem;
+    color: var(--accent);
+    letter-spacing: 0.05em;
+  }
+  .card-score.no-score { color: var(--muted); font-size: 0.75rem; font-family: 'DM Sans', sans-serif; }
+
+  .card-status {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-top: 0.3rem;
+  }
+  .status-watched { color: var(--watched); }
+  .status-watching { color: var(--watching); }
+  .status-plan { color: var(--plan); }
+
+  /* ADD CARD */
+  .add-card {
+    background: transparent;
+    border: 1px dashed var(--border);
+    border-radius: 3px;
+    aspect-ratio: unset;
+    min-height: 300px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    cursor: pointer;
+    color: var(--muted);
+    transition: all 0.2s;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  .add-card:hover { border-color: var(--accent); color: var(--accent); background: rgba(232,184,75,0.03); }
+  .add-icon { font-size: 2rem; line-height: 1; }
+
+  /* BUTTON */
+  .btn {
+    padding: 0.55rem 1.2rem;
+    border-radius: 2px;
+    border: none;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.82rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    transition: all 0.2s;
+  }
+  .btn-primary { background: var(--accent); color: #000; }
+  .btn-primary:hover { background: #f0c84e; }
+  .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+  .btn-ghost:hover { color: var(--text); border-color: var(--text); }
+  .btn-danger { background: transparent; color: var(--accent2); border: 1px solid var(--accent2); }
+  .btn-danger:hover { background: var(--accent2); color: #fff; }
+
+  /* MODAL */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    backdrop-filter: blur(4px);
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s;
+  }
+  .overlay.open { opacity: 1; pointer-events: all; }
+
+  .modal {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    width: 100%;
+    max-width: 520px;
+    max-height: 90vh;
+    overflow-y: auto;
+    transform: translateY(20px);
+    transition: transform 0.25s;
+  }
+  .overlay.open .modal { transform: translateY(0); }
+
+  .modal-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .modal-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.4rem;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+  }
+  .modal-close {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 1.3rem;
+    cursor: pointer;
+    line-height: 1;
+    transition: color 0.2s;
+  }
+  .modal-close:hover { color: var(--text); }
+
+  .modal-body { padding: 1.5rem; display: flex; flex-direction: column; gap: 1.2rem; }
+
+  .form-group { display: flex; flex-direction: column; gap: 0.4rem; }
+  .form-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+  .form-input, .form-select, .form-textarea {
+    padding: 0.6rem 0.9rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color 0.2s;
+    width: 100%;
+  }
+  .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--accent); }
+  .form-select option { background: var(--card); }
+  .form-textarea { resize: vertical; min-height: 80px; }
+
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+
+  /* SCORE INPUT */
+  .score-input-wrap { position: relative; }
+  .score-input-wrap .form-input { padding-right: 3rem; }
+  .score-suffix {
+    position: absolute;
+    right: 0.9rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+
+  /* POSTER UPLOAD */
+  .poster-upload-area {
+    border: 1px dashed var(--border);
+    border-radius: 2px;
+    padding: 1.5rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: var(--muted);
+    font-size: 0.82rem;
+  }
+  .poster-upload-area:hover { border-color: var(--accent); color: var(--accent); }
+  .poster-upload-area input { display: none; }
+  .poster-preview {
+    max-height: 180px;
+    max-width: 100%;
+    border-radius: 2px;
+    margin-bottom: 0.5rem;
+    object-fit: contain;
+  }
+
+  .modal-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  /* DETAIL MODAL */
+  .detail-modal { max-width: 680px; }
+  .detail-layout { display: grid; grid-template-columns: 160px 1fr; gap: 1.5rem; }
+  .detail-poster {
+    width: 160px;
+    border-radius: 3px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .detail-poster img { width: 100%; display: block; }
+  .detail-poster .poster-placeholder { aspect-ratio: 2/3; font-size: 2rem; }
+  .detail-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2rem;
+    letter-spacing: 0.05em;
+    line-height: 1.1;
+    margin-bottom: 0.5rem;
+  }
+  .detail-badges { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+  .badge {
+    padding: 0.2rem 0.6rem;
+    border-radius: 2px;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: 500;
+  }
+  .badge-type { background: rgba(232,184,75,0.15); color: var(--accent); }
+  .badge-status-watched { background: rgba(39,174,96,0.15); color: var(--watched); }
+  .badge-status-watching { background: rgba(41,128,185,0.15); color: var(--watching); }
+  .badge-status-plan { background: rgba(142,68,173,0.15); color: var(--plan); }
+  .detail-score-big {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 3.5rem;
+    color: var(--accent);
+    line-height: 1;
+    margin-bottom: 0.25rem;
+  }
+  .detail-score-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+  .detail-notes { font-size: 0.88rem; color: var(--muted); line-height: 1.6; margin-top: 0.75rem; font-style: italic; }
+
+  /* EMPTY STATE */
+  .empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--muted);
+  }
+  .empty-state .big { font-family: 'Bebas Neue', sans-serif; font-size: 4rem; color: var(--border); letter-spacing: 0.1em; }
+  .empty-state p { margin-top: 0.5rem; font-size: 0.9rem; }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+  @media (max-width: 600px) {
+    .detail-layout { grid-template-columns: 1fr; }
+    .detail-poster { width: 100%; max-width: 200px; }
+    .form-row { grid-template-columns: 1fr; }
+    .filters { gap: 0.5rem; }
+    .stats-bar { gap: 1rem; flex-wrap: wrap; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Cine<span>Rate</span></div>
+  <div class="header-actions">
+    <button class="btn btn-primary" onclick="openAddModal()">+ Add Title</button>
+  </div>
+</header>
+
+<div class="stats-bar" id="statsBar"></div>
+
+<div class="filters">
+  <button class="filter-btn active" data-filter="all" onclick="setFilter('all', this)">All</button>
+  <button class="filter-btn" data-filter="movie" onclick="setFilter('movie', this)">Movies</button>
+  <button class="filter-btn" data-filter="series" onclick="setFilter('series', this)">Series</button>
+  <button class="filter-btn" data-filter="watched" onclick="setFilter('watched', this)">Watched</button>
+  <button class="filter-btn" data-filter="watching" onclick="setFilter('watching', this)">Watching</button>
+  <button class="filter-btn" data-filter="plan" onclick="setFilter('plan', this)">Plan to Watch</button>
+  <input class="search-box" type="text" placeholder="Search titles..." oninput="onSearch(this.value)">
+</div>
+
+<main>
+  <div class="grid" id="grid"></div>
+</main>
+
+<!-- ADD/EDIT MODAL -->
+<div class="overlay" id="addOverlay" onclick="overlayClick(event,'addOverlay')">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle">Add Title</div>
+      <button class="modal-close" onclick="closeModal('addOverlay')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Type</label>
+          <select class="form-select" id="fType">
+            <option value="movie">Movie</option>
+            <option value="series">Series</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Year</label>
+          <input class="form-input" type="number" id="fYear" placeholder="2024" min="1900" max="2030">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Title</label>
+        <input class="form-input" type="text" id="fTitle" placeholder="e.g. Oppenheimer">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Score (0–10)</label>
+          <div class="score-input-wrap">
+            <input class="form-input" type="number" id="fScore" placeholder="8.5" min="0" max="10" step="0.1">
+            <span class="score-suffix">/10</span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Status</label>
+          <select class="form-select" id="fStatus">
+            <option value="watched">Watched</option>
+            <option value="watching">Watching</option>
+            <option value="plan">Plan to Watch</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Genre / Tags</label>
+        <input class="form-input" type="text" id="fGenre" placeholder="e.g. Sci-Fi, Thriller">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes</label>
+        <textarea class="form-textarea" id="fNotes" placeholder="Your thoughts..."></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Poster</label>
+        <div class="poster-upload-area" onclick="document.getElementById('fPoster').click()">
+          <input type="file" id="fPoster" accept="image/*" onchange="handlePosterUpload(this)">
+          <div id="posterPreviewWrap">
+            <div style="font-size:1.5rem;margin-bottom:0.3rem">🎬</div>
+            <div>Click to upload poster image</div>
+            <div style="font-size:0.72rem;margin-top:0.2rem;opacity:0.6">or paste a URL below</div>
+          </div>
+        </div>
+        <input class="form-input" type="text" id="fPosterUrl" placeholder="https://... image URL" style="margin-top:0.5rem" oninput="previewUrl(this.value)">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-danger" id="deleteBtn" onclick="deleteEntry()" style="display:none">Delete</button>
+      <div style="display:flex;gap:0.75rem;margin-left:auto">
+        <button class="btn btn-ghost" onclick="closeModal('addOverlay')">Cancel</button>
+        <button class="btn btn-primary" onclick="saveEntry()">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DETAIL MODAL -->
+<div class="overlay" id="detailOverlay" onclick="overlayClick(event,'detailOverlay')">
+  <div class="modal detail-modal">
+    <div class="modal-header">
+      <div class="modal-title">Details</div>
+      <button class="modal-close" onclick="closeModal('detailOverlay')">✕</button>
+    </div>
+    <div class="modal-body" id="detailBody"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('detailOverlay')">Close</button>
+      <button class="btn btn-primary" id="detailEditBtn" onclick="editFromDetail()">Edit</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ─── STATE ────────────────────────────────────────────────────────────────
+  let entries = JSON.parse(localStorage.getItem('cinerate_entries') || '[]');
+  let currentFilter = 'all';
+  let currentSearch = '';
+  let editingId = null;
+  let detailId = null;
+  let posterDataUrl = '';
+
+  // Seed data if empty
+  if (!entries.length) {
+    entries = [
+      { id: uid(), type: 'movie', title: 'Oppenheimer', year: 2023, score: 9.2, status: 'watched', genre: 'Drama, History', notes: 'A masterpiece of tension and storytelling.', poster: '' },
+      { id: uid(), type: 'series', title: 'Severance', year: 2022, score: 9.5, status: 'watching', genre: 'Sci-Fi, Thriller', notes: 'Absolutely gripping. Cannot stop thinking about it.', poster: '' },
+      { id: uid(), type: 'movie', title: 'Dune: Part Two', year: 2024, score: 8.8, status: 'watched', genre: 'Sci-Fi, Epic', notes: 'Visually stunning.', poster: '' },
+      { id: uid(), type: 'series', title: 'The Bear', year: 2022, score: 9.0, status: 'watched', genre: 'Drama', notes: '', poster: '' },
+      { id: uid(), type: 'movie', title: 'Alien: Romulus', year: 2024, score: null, status: 'plan', genre: 'Horror, Sci-Fi', notes: '', poster: '' },
+    ];
+    save();
+  }
+
+  function uid() { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
+  function save() { localStorage.setItem('cinerate_entries', JSON.stringify(entries)); }
+
+  // ─── RENDER ───────────────────────────────────────────────────────────────
+  function filtered() {
+    return entries.filter(e => {
+      if (currentFilter === 'movie' && e.type !== 'movie') return false;
+      if (currentFilter === 'series' && e.type !== 'series') return false;
+      if (currentFilter === 'watched' && e.status !== 'watched') return false;
+      if (currentFilter === 'watching' && e.status !== 'watching') return false;
+      if (currentFilter === 'plan' && e.status !== 'plan') return false;
+      if (currentSearch && !e.title.toLowerCase().includes(currentSearch.toLowerCase())) return false;
+      return true;
+    });
+  }
+
+  function render() {
+    const grid = document.getElementById('grid');
+    const list = filtered();
+
+    // Stats
+    const statsBar = document.getElementById('statsBar');
+    const avg = entries.filter(e => e.score).reduce((a,b,_,arr) => a + b.score/arr.length, 0);
+    statsBar.innerHTML = `
+      <div class="stat"><div class="stat-val">${entries.length}</div><div class="stat-label">Total</div></div>
+      <div class="stat"><div class="stat-val">${entries.filter(e=>e.type==='movie').length}</div><div class="stat-label">Movies</div></div>
+      <div class="stat"><div class="stat-val">${entries.filter(e=>e.type==='series').length}</div><div class="stat-label">Series</div></div>
+      <div class="stat"><div class="stat-val">${entries.filter(e=>e.status==='watched').length}</div><div class="stat-label">Watched</div></div>
+      <div class="stat"><div class="stat-val">${entries.filter(e=>e.score).length ? avg.toFixed(1) : '—'}</div><div class="stat-label">Avg Score</div></div>
+    `;
+
+    if (!list.length) {
+      grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
+        <div class="big">NO TITLES</div>
+        <p>${currentFilter === 'all' && !currentSearch ? 'Add your first movie or series!' : 'Nothing matches your filter.'}</p>
+      </div>`;
+      return;
+    }
+
+    const statusLabel = { watched: 'Watched', watching: 'Watching', plan: 'Plan to Watch' };
+    const dotClass = { watched: 'dot-watched', watching: 'dot-watching', plan: 'dot-plan' };
+    const statusClass = { watched: 'status-watched', watching: 'status-watching', plan: 'status-plan' };
+
+    grid.innerHTML = list.map((e, i) => `
+      <div class="card" style="animation-delay:${i*0.04}s" onclick="openDetail('${e.id}')">
+        <div class="card-poster-wrap">
+          ${e.poster
+            ? `<img class="card-poster" src="${e.poster}" alt="${e.title}" onerror="this.style.display='none';this.nextSibling.style.display='flex'">`
+            : ''}
+          <div class="poster-placeholder" style="${e.poster ? 'display:none' : ''}">
+            <span>${e.type === 'movie' ? '🎬' : '📺'}</span>
+            <span>${e.type}</span>
+          </div>
+          <div class="card-type-badge ${e.type==='movie'?'badge-movie':'badge-series'}">${e.type==='movie'?'FILM':'SERIES'}</div>
+          <div class="status-dot ${dotClass[e.status]}"></div>
+        </div>
+        <div class="card-body">
+          <div class="card-title" title="${e.title}">${e.title}</div>
+          <div class="card-meta">
+            <span class="card-year">${e.year || '—'}</span>
+            ${e.score != null ? `<span class="card-score">${parseFloat(e.score).toFixed(1)}</span>` : `<span class="card-score no-score">unrated</span>`}
+          </div>
+          <div class="card-status ${statusClass[e.status]}">${statusLabel[e.status]}</div>
+        </div>
+      </div>
+    `).join('') + `
+      <div class="add-card" onclick="openAddModal()">
+        <div class="add-icon">＋</div>
+        <div>Add Title</div>
+      </div>
+    `;
+  }
+
+  // ─── FILTERS / SEARCH ─────────────────────────────────────────────────────
+  function setFilter(f, btn) {
+    currentFilter = f;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    render();
+  }
+
+  function onSearch(val) {
+    currentSearch = val;
+    render();
+  }
+
+  // ─── MODALS ───────────────────────────────────────────────────────────────
+  function openAddModal(id = null) {
+    editingId = id;
+    posterDataUrl = '';
+    const entry = id ? entries.find(e => e.id === id) : null;
+    document.getElementById('modalTitle').textContent = id ? 'Edit Title' : 'Add Title';
+    document.getElementById('deleteBtn').style.display = id ? 'block' : 'none';
+
+    document.getElementById('fType').value = entry?.type || 'movie';
+    document.getElementById('fTitle').value = entry?.title || '';
+    document.getElementById('fYear').value = entry?.year || '';
+    document.getElementById('fScore').value = entry?.score ?? '';
+    document.getElementById('fStatus').value = entry?.status || 'watched';
+    document.getElementById('fGenre').value = entry?.genre || '';
+    document.getElementById('fNotes').value = entry?.notes || '';
+    document.getElementById('fPosterUrl').value = '';
+
+    const pw = document.getElementById('posterPreviewWrap');
+    if (entry?.poster) {
+      pw.innerHTML = `<img class="poster-preview" src="${entry.poster}"><div style="font-size:0.75rem;margin-top:0.3rem">Click to change</div>`;
+      posterDataUrl = entry.poster;
+    } else {
+      pw.innerHTML = `<div style="font-size:1.5rem;margin-bottom:0.3rem">🎬</div><div>Click to upload poster image</div><div style="font-size:0.72rem;margin-top:0.2rem;opacity:0.6">or paste a URL below</div>`;
+    }
+
+    document.getElementById('addOverlay').classList.add('open');
+  }
+
+  function closeModal(id) {
+    document.getElementById(id).classList.remove('open');
+  }
+
+  function overlayClick(e, id) {
+    if (e.target.id === id) closeModal(id);
+  }
+
+  function handlePosterUpload(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      posterDataUrl = ev.target.result;
+      document.getElementById('posterPreviewWrap').innerHTML =
+        `<img class="poster-preview" src="${posterDataUrl}"><div style="font-size:0.75rem;margin-top:0.3rem">Click to change</div>`;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function previewUrl(url) {
+    if (!url) return;
+    posterDataUrl = url;
+    document.getElementById('posterPreviewWrap').innerHTML =
+      `<img class="poster-preview" src="${url}" onerror="this.style.opacity=0.3"><div style="font-size:0.75rem;margin-top:0.3rem">URL set</div>`;
+  }
+
+  function saveEntry() {
+    const title = document.getElementById('fTitle').value.trim();
+    if (!title) { alert('Please enter a title.'); return; }
+
+    const scoreRaw = document.getElementById('fScore').value;
+    const score = scoreRaw !== '' ? Math.min(10, Math.max(0, parseFloat(scoreRaw))) : null;
+
+    const data = {
+      type: document.getElementById('fType').value,
+      title,
+      year: parseInt(document.getElementById('fYear').value) || null,
+      score: isNaN(score) ? null : score,
+      status: document.getElementById('fStatus').value,
+      genre: document.getElementById('fGenre').value.trim(),
+      notes: document.getElementById('fNotes').value.trim(),
+      poster: posterDataUrl || '',
+    };
+
+    if (editingId) {
+      const idx = entries.findIndex(e => e.id === editingId);
+      entries[idx] = { ...entries[idx], ...data };
+    } else {
+      entries.unshift({ id: uid(), ...data });
+    }
+
+    save();
+    closeModal('addOverlay');
+    render();
+  }
+
+  function deleteEntry() {
+    if (!confirm('Delete this entry?')) return;
+    entries = entries.filter(e => e.id !== editingId);
+    save();
+    closeModal('addOverlay');
+    closeModal('detailOverlay');
+    render();
+  }
+
+  // ─── DETAIL ───────────────────────────────────────────────────────────────
+  function openDetail(id) {
+    detailId = id;
+    const e = entries.find(x => x.id === id);
+    const statusLabel = { watched: 'Watched', watching: 'Watching', plan: 'Plan to Watch' };
+    const statusBadge = { watched: 'badge-status-watched', watching: 'badge-status-watching', plan: 'badge-status-plan' };
+
+    document.getElementById('detailBody').innerHTML = `
+      <div class="detail-layout">
+        <div class="detail-poster">
+          ${e.poster
+            ? `<img src="${e.poster}" alt="${e.title}" onerror="this.parentNode.innerHTML='<div class=poster-placeholder style=aspect-ratio:2/3;font-size:1.8rem><span>${e.type==='movie'?'🎬':'📺'}</span></div>'">`
+            : `<div class="poster-placeholder" style="aspect-ratio:2/3;font-size:1.8rem"><span>${e.type==='movie'?'🎬':'📺'}</span></div>`
+          }
+        </div>
+        <div>
+          <div class="detail-title">${e.title}</div>
+          <div class="detail-badges">
+            <span class="badge badge-type">${e.type === 'movie' ? 'Movie' : 'Series'}</span>
+            <span class="badge ${statusBadge[e.status]}">${statusLabel[e.status]}</span>
+            ${e.genre ? `<span class="badge" style="background:rgba(255,255,255,0.05);color:var(--muted)">${e.genre}</span>` : ''}
+            ${e.year ? `<span class="badge" style="background:rgba(255,255,255,0.05);color:var(--muted)">${e.year}</span>` : ''}
+          </div>
+          ${e.score != null
+            ? `<div class="detail-score-big">${parseFloat(e.score).toFixed(1)}<span style="font-size:1.2rem;color:var(--muted)">/10</span></div>
+               <div class="detail-score-label">My Score</div>`
+            : `<div style="color:var(--muted);font-size:0.85rem;margin-top:0.5rem">Not rated yet</div>`
+          }
+          ${e.notes ? `<div class="detail-notes">"${e.notes}"</div>` : ''}
+        </div>
+      </div>
+    `;
+    document.getElementById('detailOverlay').classList.add('open');
+  }
+
+  function editFromDetail() {
+    closeModal('detailOverlay');
+    openAddModal(detailId);
+  }
+
+  // ─── KEYBOARD ─────────────────────────────────────────────────────────────
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      closeModal('addOverlay');
+      closeModal('detailOverlay');
+    }
+  });
+
+  // ─── INIT ─────────────────────────────────────────────────────────────────
+  render();
+</script>
+</body>
+</html>
